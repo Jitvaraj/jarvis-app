@@ -1,0 +1,40 @@
+/* Additions for the OmniRoute chat + setup UI */
+
+/* jarvis.css has a garbled "padding" on .api-key-input (stray Korean text), so restore it here */
+.command-input,
+.api-key-input {
+  box-sizing: border-box;
+}
+
+.api-key-input {
+  padding: 12px;
+}
+
+/* Orb pulses faster while JARVIS is waiting on a reply */
+.blue-orb.thinking {
+  animation-duration: 1.2s;
+}
+
+.hud-button {
+  padding: 10px 20px;
+  color: #66ccff;
+  background: rgba(0, 15, 40, 0.8);
+  border: 1px solid rgba(0, 102, 255, 0.8);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.hud-button:hover:not(:disabled) {
+  color: #fff;
+  box-shadow: 0 0 15px rgba(0, 102, 255, 0.5);
+}
+
+.hud-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
