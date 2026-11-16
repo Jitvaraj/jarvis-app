@@ -1,41 +1,87 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import api, { DEFAULT_BASE_URL, DEFAULT_MODEL, normalizeBaseUrl } from './ApiService'
 
 const SettingsContext = createContext()
 
+const KEY_STORE = 'jarvis-omniroute-key'
+const SETTINGS_STORE = 'jarvis-omniroute-settings'
+
+const read = (name) => {
+  try {
+    return localStorage.getItem(name)
+  } catch {
+    return null
+  }
+}
+
+const write = (name, value) => {
+  try {
+    localStorage.setItem(name, value)
+  } catch {
+    // storage unavailable (private mode) - settings just won't persist
+  }
+}
+
+function loadSettings() {
+  const defaults = { baseUrl: DEFAULT_BASE_URL, model: DEFAULT_MODEL, temperature: 0.7 }
+  try {
+    return { ...defaults, ...JSON.parse(read(SETTINGS_STORE) || '{}') }
+  } catch {
+    return defaults
+  }
+}
+
 export function SettingsProvider({ children }) {
-  const [apiKeys, setApiKeys] = useState({})
+  const [apiKey, setApiKey] = useState(() => read(KEY_STORE) || '')
+  const [settings, setSettings] = useState(loadSettings)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [settings, setSettings] = useState({
-    provider: 'openai',
-    model: 'gpt-4',
-    temperature: 0.7,
-    maxTokens: 1000,
-    baseUrl: 'https://api.openai.com/v1'
-  })
+  const [connection, setConnection] = useState({ status: 'idle', models: [] })
+  const testId = useRef(0)
 
-  const updateApiKeys = (newKeys) => {
-    setApiKeys(newKeys)
-    // Save to localStorage
-    localStorage.setItem('jarvis-api-keys', JSON.stringify(newKeys))
+  // Keep the API client in sync with whatever is saved
+  useEffect(() => {
+    api.configure({ apiKey, ...settings })
+  }, [apiKey, settings])
+
+  // Check the connection (GET /models) with the given key + URL
+  const runTest = async (cfg) => {
+    const id = ++testId.current
+    if (!cfg.apiKey || !cfg.baseUrl) {
+      setConnection({ status: 'idle', models: [] })
+      return { ok: false, message: 'Add your OmniRoute API key and URL first.' }
+    }
+    setConnection((c) => ({ ...c, status: 'checking' }))
+    api.configure(cfg)
+    const result = await api.testConnection()
+    if (id === testId.current) {
+      setConnection({ status: result.ok ? 'online' : 'error', models: result.models })
+    }
+    return result
   }
 
-  const updateSettings = (newSettings) => {
-    setSettings({ ...settings, ...newSettings })
-    localStorage.setItem('jarvis-settings', JSON.stringify({ ...settings, ...newSettings }))
-  }
+  // Check the saved connection once on startup
+  useEffect(() => {
+    runTest({ apiKey, ...settings })
+  }, [])
 
-  const openSettings = () => setIsSettingsOpen(true)
-  const closeSettings = () => setIsSettingsOpen(false)
+  const saveConnection = ({ apiKey: key, ...patch }) => {
+    const next = { ...settings, ...patch, baseUrl: normalizeBaseUrl(patch.baseUrl) }
+    setApiKey(key)
+    setSettings(next)
+    write(KEY_STORE, key)
+    write(SETTINGS_STORE, JSON.stringify(next))
+    return runTest({ apiKey: key, ...next })
+  }
 
   return (
     <SettingsContext.Provider value={{
-      apiKeys,
-      updateApiKeys,
+      apiKeys: apiKey ? { omniroute: apiKey } : {},
       settings,
-      updateSettings,
+      connection,
+      saveConnection,
       isSettingsOpen,
-      openSettings,
-      closeSettings
+      openSettings: () => setIsSettingsOpen(true),
+      closeSettings: () => setIsSettingsOpen(false)
     }}>
       {children}
     </SettingsContext.Provider>

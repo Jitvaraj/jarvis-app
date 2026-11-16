@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
 import '../styles/jarvis.css'
 
-function HUD({ onNavigate, currentPage, apiKeys }) {
+function HUD({ onNavigate, onOpenSettings, currentPage, apiKeys, isOnline }) {
   const [time, setTime] = useState(new Date())
-  const [isOnline, setIsOnline] = useState(true)
 
   // Update time every second
   useEffect(() => {
@@ -32,7 +31,7 @@ function HUD({ onNavigate, currentPage, apiKeys }) {
           </button>
 
           <button
-            className="nav-tab"
+            className={`nav-tab ${currentPage === 'connect' ? 'active' : ''}`}
             onClick={() => onNavigate('connect')}
             style={{ padding: '8px', fontSize: '0.8rem' }}
           >
@@ -40,11 +39,19 @@ function HUD({ onNavigate, currentPage, apiKeys }) {
           </button>
 
           <button
-            className="nav-tab"
+            className={`nav-tab ${currentPage === 'logs' ? 'active' : ''}`}
             onClick={() => onNavigate('logs')}
             style={{ padding: '8px', fontSize: '0.8rem' }}
           >
             LOGS
+          </button>
+
+          <button
+            className="nav-tab"
+            onClick={onOpenSettings}
+            style={{ padding: '8px', fontSize: '0.8rem' }}
+          >
+            SETUP
           </button>
         </div>
 

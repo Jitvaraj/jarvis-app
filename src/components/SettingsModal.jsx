@@ -1,54 +1,34 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import '../styles/jarvis.css'
+import '../styles/omniroute.css'
+import { useSettings } from '../context/SettingsContext'
+import { DEFAULT_MODEL, normalizeBaseUrl } from '../context/ApiService'
 
-function SettingsModal({ isOpen, onClose }) {
-  const [apiKey, setApiKey] = useState('')
-  const [provider, setProvider] = useState('openai')
-  const [model, setModel] = useState('gpt-4')
-  const [baseUrl, setBaseUrl] = useState('https://api.openai.com/v1')
-  const [temperature, setTemperature] = useState(0.7)
-  const [isConnected, setIsConnected] = useState(false)
+const labelStyle = { display: 'block', marginBottom: '5px', color: '#0066ff' }
+const fieldStyle = { marginBottom: '15px' }
+const hintStyle = { fontSize: '0.75rem', color: '#777', marginTop: '4px' }
 
-  useEffect(() => {
-    // Load saved settings
-    const savedKeys = localStorage.getItem('jarvis-api-keys')
-    const savedSettings = localStorage.getItem('jarvis-settings')
+function SettingsForm({ onClose }) {
+  const { apiKeys, settings, connection, saveConnection } = useSettings()
+  const [apiKey, setApiKey] = useState(apiKeys.omniroute || '')
+  const [baseUrl, setBaseUrl] = useState(settings.baseUrl)
+  const [model, setModel] = useState(settings.model)
+  const [temperature, setTemperature] = useState(settings.temperature)
+  const [result, setResult] = useState(null)
 
-    if (savedKeys) {
-      const keys = JSON.parse(savedKeys)
-      setApiKey(keys[provider] || '')
-    }
-
-    if (savedSettings) {
-      const settings = JSON.parse(savedSettings)
-      setModel(settings.model || 'gpt-4')
-      setBaseUrl(settings.baseUrl || 'https://api.openai.com/v1')
-      setTemperature(settings.temperature || 0.7)
-    }
-  }, [provider])
-
-  const handleSave = () => {
-    const newKeys = { ...JSON.parse(localStorage.getItem('jarvis-api-keys') || '{}'), [provider]: apiKey }
-    const newSettings = {
-      provider,
-      model,
-      baseUrl,
-      temperature
-    }
-
-    localStorage.setItem('jarvis-api-keys', JSON.stringify(newKeys))
-    localStorage.setItem('jarvis-settings', JSON.stringify(newSettings))
-
-    // Test connection
-    testConnection()
+  const handleSave = async () => {
+    const url = normalizeBaseUrl(baseUrl)
+    setBaseUrl(url)
+    setResult({ message: 'Testing connection...' })
+    setResult(
+      await saveConnection({
+        apiKey: apiKey.trim(),
+        baseUrl: url,
+        model: model.trim() || DEFAULT_MODEL,
+        temperature
+      })
+    )
   }
-
-  const testConnection = async () => {
-    setIsConnected(true)
-    setTimeout(() => setIsConnected(false), 2000)
-  }
-
-  if (!isOpen) return null
 
   return (
     <div style={{
@@ -63,57 +43,65 @@ function SettingsModal({ isOpen, onClose }) {
       justifyContent: 'center',
       zIndex: 1000
     }}>
-      <div className="hud-panel" style={{ padding: '30px', maxWidth: '500px', width: '90%' }}>
+      <div className="hud-panel" style={{
+        padding: '30px',
+        maxWidth: '500px',
+        width: '90%',
+        maxHeight: '90vh',
+        overflowY: 'auto',
+        boxSizing: 'border-box',
+        textAlign: 'left'
+      }}>
         <h2 className="holographic" style={{ marginBottom: '20px' }}>SYSTEM SETTINGS</h2>
 
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', color: '#0066ff' }}>PROVIDER</label>
-          <select
-            value={provider}
-            onChange={(e) => setProvider(e.target.value)}
-            className="api-key-input"
-          >
-            <option value="openai">OpenAI</option>
-            <option value="anthropic">Anthropic</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', color: '#0066ff' }}>API KEY</label>
+        <div style={fieldStyle}>
+          <label style={labelStyle}>OMNIROUTE API KEY</label>
           <input
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder="Enter your API key"
+            placeholder="Paste your API key"
             className="api-key-input"
+            autoComplete="off"
+            autoCapitalize="off"
+            spellCheck={false}
           />
         </div>
 
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', color: '#0066ff' }}>MODEL</label>
+        <div style={fieldStyle}>
+          <label style={labelStyle}>OMNIROUTE URL</label>
           <input
             type="text"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            placeholder="e.g., gpt-4"
-            className="api-key-input"
-          />
-        </div>
-
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', color: '#0066ff' }}>BASE URL</label>
-          <input
-            type="text"
+            inputMode="url"
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
-            placeholder="https://api.openai.com/v1"
+            placeholder="https://your-omniroute-host/v1"
             className="api-key-input"
+            autoCapitalize="off"
+            spellCheck={false}
           />
+          <div style={hintStyle}>Saved in this browser. Must be reachable from where this app runs.</div>
         </div>
 
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', color: '#0066ff' }}>TEMPERATURE ({temperature})</label>
+        <div style={fieldStyle}>
+          <label style={labelStyle}>MODEL</label>
+          <input
+            type="text"
+            list="omniroute-models"
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder={DEFAULT_MODEL}
+            className="api-key-input"
+            autoCapitalize="off"
+            spellCheck={false}
+          />
+          <datalist id="omniroute-models">
+            {connection.models.map((id) => <option key={id} value={id} />)}
+          </datalist>
+        </div>
+
+        <div style={fieldStyle}>
+          <label style={labelStyle}>TEMPERATURE ({temperature})</label>
           <input
             type="range"
             min="0"
@@ -122,30 +110,36 @@ function SettingsModal({ isOpen, onClose }) {
             value={temperature}
             onChange={(e) => setTemperature(parseFloat(e.target.value))}
             className="api-key-input"
-            style={{ width: '100%' }}
           />
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+        {result && (
+          <p style={{
+            marginBottom: '15px',
+            wordBreak: 'break-word',
+            color: result.ok ? '#66ff99' : result.ok === false ? '#ff6666' : '#66ccff'
+          }}>
+            {result.ok ? '✓ ' : ''}{result.message}
+          </p>
+        )}
+
+        <div style={{ display: 'flex', gap: '10px' }}>
           <button
-            className="nav-tab"
+            className="hud-button"
             onClick={handleSave}
-            disabled={!apiKey}
+            disabled={!apiKey.trim() || !baseUrl.trim()}
           >
             SAVE & TEST
-            {isConnected && <span style={{ marginLeft: '10px' }}>✓</span>}
           </button>
-          <button
-            className="nav-tab"
-            onClick={onClose}
-            style={{ background: 'rgba(255, 255, 255, 0.1)' }}
-          >
-            CANCEL
-          </button>
+          <button className="hud-button" onClick={onClose}>CLOSE</button>
         </div>
       </div>
     </div>
   )
+}
+
+function SettingsModal({ isOpen, onClose }) {
+  return isOpen ? <SettingsForm onClose={onClose} /> : null
 }
 
 export default SettingsModal
